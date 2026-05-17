@@ -1,0 +1,37 @@
+---
+title: "{{ report.title }}"
+description: "{{ report.description }}"
+date: {{ report.date }}
+draft: false
+part_number: "{{ report.part_number }}"
+categories: [product]
+tags: [hardware]
+---
+{% for simulation in simulations %}
+
+## {{ simulation.title }}
+{% if simulation.description %}
+
+{{ simulation.description }}
+{% endif %}
+{% if simulation.schematic %}
+
+### Schematic
+
+<img src="{{ simulation.schematic }}" alt="{{ simulation.title }} schematic" style="max-width:100%">
+{% endif %}
+{% if simulation.plots %}
+
+### Simulation Results
+{% for plot in simulation.plots %}
+
+#### {{ plot.title }}
+
+{{ plot.shortcode }}
+{%- if plot.description %}
+
+{{ plot.description }}
+{% endif %}
+{% endfor %}
+{% endif %}
+{% endfor %}

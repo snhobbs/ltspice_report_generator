@@ -1,0 +1,26 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "simulation-reporter"
+version = "0.1.0"
+requires-python = ">=3.11"
+dependencies = [
+	"click>=8.0",
+	"matplotlib>=3.5",
+	"numpy",
+	"jinja2",
+	"ltspice-runner",
+	"ltspice_to_svg",
+]
+
+[project.scripts]
+simulation-reporter = "simulation_reporter.cli:cli"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/simulation_reporter"]
+
+#[tool.uv.sources]
+#ltspice-runner = { path = "../ltspice_runner" }
+#ltspice_to_svg = { path = "../ltspice_to_svg" }
