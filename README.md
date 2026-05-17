@@ -1,57 +1,33 @@
-# QL03
+# simulation-reporter
 
-- file: QL03_LM6172_700kHzAsBuilt
-- Primary Input: I1 Current Source
-- Output Node: out
-- TIA Resistor: R16
-- Diode Stray Capacitance: C10 (12p default)
-- Test Suite: Photoreceiver Standard + Diode Capacitance Sweep
+Meta tool aimed at simplifying making reports about ltspice simulations easier.
 
-# QL01
+## Tools
 
-- file: QL01E
-- Primary Input: I1 Current Source
-- Output Node: out3
-- TIA Resistor: Rf
-- Diode Stray Capacitance: C3 (Cd stepped)
-- Diode Series Resistance: Rd (Rs stepped)
-- Test Suite: Photoreceiver Standard + Diode Capacitance Sweep
+- [ltspice-runner](https://github.com/snhobbs/ltspice-runner) — simulation runner
+- [ltspice_to_svg](https://github.com/snhobbs/ltspice_to_svg) — schematic export to svg
+- [ltspice](https://github.com/DongHoonPark/ltspice_pytool) — Simulation raw file parser
 
-# 7ns SiPM Frontend
+## Components
 
-- file: SiPM/7nsBroadcomFrontend/spice/BFU520cascodeSiPM_7nsOutputAmp.asc
-- Primary Input: I1 Current Source
-- Output Node: out3
-- TIA Resistor: Rf
-- Diode Stray Capacitance: C3 (Cd stepped)
-- Diode Series Resistance: Rd (Rs stepped)
-- Test Suite: Photoreceiver Standard + Diode Capacitance Sweep
-- Status: Incomplete
+- Standard test suites: Simulation sets with plot sets
+  - Voltage Amplifiers
+  - TIAs
+  - Photoreceivers
+  - Power Supplies
+  - Current Supplies
 
-# Marktech APD
+- Plotting Tools: Style and standard plotting types
+  - Noise analysis
+  - DC Operating point
+  - AC Sweep
+  - Parameter sweeps
+  - Step response
 
-- file: MarktechBFU520CascTIA.asc
-- Primary Input: I1 Current Source
-- Output Node: out
-- TIA Resistor: R16 (default 2K)
-- Diode Stray Capacitance: Cs4 (Cs4 default 4.5p)
-- Test Suite: Photoreceiver Standard + Diode Capacitance Sweep
+- Makefiles: Example make files for standard report styles, one for each Test suite type
 
-## Project Simulations
+## Built-in suites
 
-A project description has a set of spice schematics simulating given sections.
-A project report should have the schematic svgs and a set of plots of the output.
-
-The project simulations could be a toml file describing everything that gets compiled into a report. Some plots will be highly specific so will need a python script for simulating and plotting. The python file should be specified in the toml file (or yaml) and built with a makefile so the makefile doesnt need to rerun.
-
-## How to make svg
-
-The following creates a {FILENAME}.svg from a {FILENAME}.asc
-
-```bash
-ltspice_to_svg demo.asc
-```
-
-## Makefile
-
-The svg export, report compilation, and simulations should be called with a Makefile that lives with the project. Use markdown for the report structure and incorporate them into the eoi_document_generator as pages.
+| Name             | Simulations                          |
+| ---------------- | ------------------------------------ |
+| `opamp_standard` | step response, AC sweep, noise sweep |

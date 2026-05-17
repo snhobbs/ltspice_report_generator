@@ -1,0 +1,3 @@
+[submodule "extern/hugo-document-generator"]
+	path = extern/hugo-document-generator
+	url = https://github.com/snhobbs/hugo-document-generator

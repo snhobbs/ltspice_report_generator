@@ -1,12 +1,10 @@
----
-title: "{{ report.title }}"
-description: "{{ report.description }}"
-date: {{ report.date }}
-draft: false
-part_number: "{{ report.part_number }}"
-categories: {{ report.categories | tojson }}
-tags: {{ report.tags | tojson }}
----
+# {{ report.title }}
+{% if report.description %}
+
+{{ report.description }}
+{% endif %}
+
+_{{ report.date }}_
 {% for simulation in simulations %}
 
 ## {{ simulation.title }}
@@ -18,7 +16,7 @@ tags: {{ report.tags | tojson }}
 
 ### Schematic
 
-{{ '{{<' }} imgprint src="{{ simulation.schematic }}" caption="{{ simulation.title }} schematic" layout="full" {{ '>}}' }}
+![{{ simulation.title }} schematic]({{ simulation.schematic_rel }})
 {% endif %}
 {% if simulation.plots %}
 
@@ -27,7 +25,7 @@ tags: {{ report.tags | tojson }}
 
 #### {{ plot.title }}
 
-{{ plot.shortcode }}
+![{{ plot.caption }}]({{ plot.rel_path }})
 {%- if plot.description %}
 
 {{ plot.description }}

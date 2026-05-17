@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 import logging
 import shutil
 import subprocess
@@ -9,28 +11,32 @@ matplotlib.use("Agg")
 
 from ltspice_runner import Netlist, plot_raw
 from ltspice_runner import run_simulations as _ltspice_run
-from ltspice_runner.runner import DEFAULT_LTSPICE
+from ltspice_runner.runner import DEFAULT_LTSPICE, export_netlist
 
-from .config import PACKAGE_DIR, filter_circuits, resolve
-from .suites import SUITES
+from .config import (
+    PACKAGE_DIR, Config, CircuitConfig, PlotConfig, ProjectConfig, ReportConfig,
+    filter_circuits, resolve,
+)
+from .suites import load_suite
 
 logger = logging.getLogger(__name__)
 
 
-# ── SVG export ───────────────────────────────────────────────────────────────
+# ── SVG export ────────────────────────────────────────────────────────────────
 
-def svg(config: dict, circuit_slug: str | None = None) -> None:
-    paths = config["project"]["paths"]
-    build_base = resolve(paths["build"])
-    ltspice_to_svg = paths.get("ltspice_to_svg", "ltspice_to_svg")
-    for c in filter_circuits(config["circuits"], circuit_slug):
-        _export_svg(ltspice_to_svg, resolve(c["asc"]), build_base / c["slug"] / "schematic.svg", c["name"])
+def svg(config: Config, circuit_slug: str | None = None) -> None:
+    build_base = resolve(config.project.paths.build)
+    ltspice_to_svg = config.project.paths.ltspice_to_svg
+    for c in filter_circuits(config.circuits, circuit_slug):
+        _export_svg(ltspice_to_svg, resolve(c.asc),
+                    build_base / c.slug / "schematic.svg", c.name)
 
 
 def _export_svg(ltspice_to_svg: str, asc_path: Path, out_path: Path, name: str) -> None:
     out_path.parent.mkdir(parents=True, exist_ok=True)
     logger.info("svg  %s", name)
-    result = subprocess.run([ltspice_to_svg, str(asc_path), "-o", str(out_path)], capture_output=True, text=True)
+    result = subprocess.run([ltspice_to_svg, str(asc_path), "-o", str(out_path)],
+                            capture_output=True, text=True)
     if result.returncode != 0:
         logger.error("  ERROR: %s", result.stderr.strip())
     else:
@@ -39,20 +45,23 @@ def _export_svg(ltspice_to_svg: str, asc_path: Path, out_path: Path, name: str) 
 
 # ── Simulation ────────────────────────────────────────────────────────────────
 
-def sim(config: dict, circuit_slug: str | None = None, ltspice_cmd: str = DEFAULT_LTSPICE) -> None:
-    build_base = resolve(config["project"]["paths"]["build"])
-    for c in filter_circuits(config["circuits"], circuit_slug):
-        _simulate(c, build_base / c["slug"], ltspice_cmd)
+def sim(config: Config, circuit_slug: str | None = None,
+        ltspice_cmd: str = DEFAULT_LTSPICE,
+        suite_fn: callable | None = None) -> None:
+    build_base = resolve(config.project.paths.build)
+    for c in filter_circuits(config.circuits, circuit_slug):
+        _simulate(c, build_base / c.slug, ltspice_cmd, suite_fn)
 
 
-def _simulate(c: dict, build_dir: Path, ltspice_cmd: str) -> None:
-    net_path = resolve(c["asc"]).with_suffix(".net")
-    if not net_path.exists():
-        logger.info("sim  %s: no .net file, skipping", c["name"])
-        return
-    suite = SUITES[c["test_suite"]](c["input_node"], c["output_node"])
-    logger.info("sim  %s", c["name"])
+def _simulate(c: CircuitConfig, build_dir: Path, ltspice_cmd: str,
+              suite_fn: callable | None) -> None:
+    asc_path = resolve(c.asc)
+    build_dir.mkdir(parents=True, exist_ok=True)
+    logger.info("sim  %s", c.name)
     try:
+        net_path = export_netlist(asc_path, ltspice_cmd=ltspice_cmd, build_dir=build_dir)
+        fn = suite_fn or load_suite(c)[0]
+        suite = fn(c.input_node, c.output_node)
         _ltspice_run(Netlist.from_file(net_path), suite, build_dir, ltspice_cmd=ltspice_cmd)
         logger.info("  -> %s", build_dir)
     except RuntimeError as e:
@@ -61,27 +70,36 @@ def _simulate(c: dict, build_dir: Path, ltspice_cmd: str) -> None:
 
 # ── Plots ─────────────────────────────────────────────────────────────────────
 
-def plots(config: dict, circuit_slug: str | None = None) -> None:
-    build_base = resolve(config["project"]["paths"]["build"])
-    for c in filter_circuits(config["circuits"], circuit_slug):
-        build_dir = build_base / c["slug"]
+def plots(config: Config, circuit_slug: str | None = None,
+          plot_fn: callable | None = None) -> None:
+    build_base = resolve(config.project.paths.build)
+    for c in filter_circuits(config.circuits, circuit_slug):
+        build_dir = build_base / c.slug
         build_dir.mkdir(parents=True, exist_ok=True)
-        existing_dir = resolve(c["existing_sim_dir"]) if c.get("existing_sim_dir") else None
-        suite = SUITES[c["test_suite"]](c["input_node"], c["output_node"])
-        for case in suite:
-            _plot(c, case, build_dir, existing_dir)
+        existing_dir = resolve(c.existing_sim_dir) if c.existing_sim_dir else None
+        for plot_def in c.plots:
+            _plot(c, plot_def, build_dir, existing_dir, plot_fn)
 
 
-def _plot(c: dict, case, build_dir: Path, existing_dir: Path | None) -> None:
-    raw_path = _find_raw(case.label, build_dir, existing_dir)
+def _plot(c: CircuitConfig, plot_def: PlotConfig, build_dir: Path,
+          existing_dir: Path | None, plot_fn: callable | None = None) -> None:
+    label = plot_def.label
+    raw_path = _find_raw(label, build_dir, existing_dir)
     if raw_path is None:
-        logger.info("  skip %s/%s: no .raw file", c["slug"], case.label)
+        logger.info("  skip %s/%s: no .raw file", c.slug, label)
         return
-    png_path = build_dir / f"{case.label}.png"
-    logger.info("plot %s / %s", c["name"], case.label)
+    png_path = build_dir / f"{label}.png"
+    title = plot_def.title or label.replace("_", " ").title()
+    logger.info("plot %s / %s", c.name, label)
     try:
-        plot_raw(raw_path, variables=case.plot_vars, output_path=png_path,
-                 title=f"{c['name']} — {case.label.replace('_', ' ')}", db=(case.label == "ac_sweep"))
+        if plot_fn is not None:
+            plot_fn(plot_def, raw_path, png_path)
+        elif plot_def.vars:
+            plot_raw(raw_path, variables=plot_def.vars, output_path=png_path,
+                     title=title, db=plot_def.db)
+        else:
+            logger.debug("  skip %s/%s: no vars and no plot script", c.slug, label)
+            return
         logger.info("  -> %s", png_path)
     except Exception as e:
         logger.error("  ERROR: %s", e)
@@ -100,38 +118,55 @@ def _find_raw(label: str, build_dir: Path, existing_dir: Path | None) -> Path | 
 
 # ── Report ────────────────────────────────────────────────────────────────────
 
-def report(config: dict) -> None:
-    proj = config["project"]
-    paths = proj["paths"]
-    project_name = proj["name"]
-    build_base = resolve(paths["build"])
-    report_path = resolve(paths["report"])
-    hugo_root = resolve(paths.get("hugo_root", ".."))
+def report(config: Config, hugo_root: Path | None = None) -> None:
+    proj = config.project
+    project_name = proj.name
+    build_base = resolve(proj.paths.build)
 
-    png_assets_dir = hugo_root / "assets" / "media" / "uploads" / project_name
-    svg_static_dir = hugo_root / "static" / "sim" / project_name
-    png_assets_dir.mkdir(parents=True, exist_ok=True)
-    svg_static_dir.mkdir(parents=True, exist_ok=True)
+    if hugo_root is None:
+        hugo_root = resolve(proj.paths.hugo_root)
 
-    simulations = [
-        _build_simulation(c, build_base / c["slug"], svg_static_dir, png_assets_dir, project_name)
-        for c in config["circuits"]
-    ]
-    _render_report(proj, simulations, report_path)
-    logger.info("report -> %s", report_path)
+    assets_dir = hugo_root / "assets" / "media" / "uploads" / project_name
+    assets_dir.mkdir(parents=True, exist_ok=True)
+
+    simulations = []
+    all_written: set[Path] = set()
+    for c in config.circuits:
+        sim_data, written = _build_simulation(c, build_base / c.slug, assets_dir, project_name)
+        simulations.append(sim_data)
+        all_written.update(written)
+
+    _prune(assets_dir, all_written)
+
+    targets = proj.reports or [ReportConfig(template=proj.template, path=proj.paths.report)]
+    for r in targets:
+        path = resolve(r.path)
+        _render_report(proj, simulations, path, r.template)
+        logger.info("report -> %s", path)
 
 
-def _build_simulation(c: dict, build_dir: Path, svg_static_dir: Path,
-                      png_assets_dir: Path, project_name: str) -> dict:
-    slug = c["slug"]
-    suite = SUITES[c["test_suite"]](c["input_node"], c["output_node"])
-    schematic_url = _copy_schematic(build_dir / "schematic.svg", svg_static_dir / slug, project_name, slug)
-    plots_data = [
-        p for case in suite
-        if (p := _build_plot(case, build_dir, png_assets_dir, project_name, c["name"], slug))
-    ]
-    return {"title": c["name"], "description": c.get("description", ""),
-            "schematic": schematic_url, "plots": plots_data}
+def _build_simulation(c: CircuitConfig, build_dir: Path, assets_dir: Path,
+                      project_name: str) -> tuple[dict, set[Path]]:
+    slug = c.slug
+    written: set[Path] = set()
+
+    svg_dst = assets_dir / slug / "schematic.svg"
+    schematic_path = _copy_schematic(build_dir / "schematic.svg", assets_dir / slug,
+                                     project_name, slug)
+    if schematic_path:
+        written.add(svg_dst)
+
+    plots_data = []
+    for plot_def in c.plots:
+        p = _build_plot(plot_def, build_dir, assets_dir, project_name, c.name, slug)
+        if p:
+            plots_data.append(p)
+            written.add(assets_dir / slug / f"{plot_def.label}.png")
+
+    return {"title": c.name, "description": c.description,
+            "schematic": schematic_path,
+            "schematic_rel": f"{slug}/schematic.svg" if schematic_path else "",
+            "plots": plots_data}, written
 
 
 def _copy_schematic(svg_src: Path, dst_dir: Path, project_name: str, slug: str) -> str:
@@ -139,43 +174,74 @@ def _copy_schematic(svg_src: Path, dst_dir: Path, project_name: str, slug: str) 
         return ""
     dst_dir.mkdir(parents=True, exist_ok=True)
     shutil.copy2(svg_src, dst_dir / "schematic.svg")
-    return f"/sim/{project_name}/{slug}/schematic.svg"
+    return f"media/uploads/{project_name}/{slug}/schematic.svg"
 
 
-def _build_plot(case, build_dir: Path, png_assets_dir: Path,
+def _build_plot(plot_def: PlotConfig, build_dir: Path, assets_dir: Path,
                 project_name: str, circuit_name: str, slug: str) -> dict | None:
-    png_src = build_dir / f"{case.label}.png"
+    label = plot_def.label
+    png_src = build_dir / f"{label}.png"
     if not png_src.exists():
         return None
-    dst = png_assets_dir / slug / f"{case.label}.png"
+    dst = assets_dir / slug / f"{label}.png"
     dst.parent.mkdir(parents=True, exist_ok=True)
     shutil.copy2(png_src, dst)
-    label_title = case.label.replace("_", " ").title()
-    asset_path = f"media/uploads/{project_name}/{slug}/{case.label}.png"
-    caption = f"{circuit_name} — {label_title}"
+    title = plot_def.title or label.replace("_", " ").title()
+    asset_path = f"media/uploads/{project_name}/{slug}/{label}.png"
+    caption = f"{circuit_name} — {title}"
     return {
-        "title": label_title,
+        "title": title,
         "caption": caption,
         "path": asset_path,
+        "rel_path": f"{slug}/{label}.png",
         "shortcode": f'{{{{< imgprint src="{asset_path}" caption="{caption}" layout="full" cmd="Resize" opts="1200x q90" >}}}}',
-        "description": "",
+        "description": plot_def.description,
     }
 
 
-def _render_report(proj: dict, simulations: list[dict], report_path: Path) -> None:
+def _prune(base: Path, keep: set[Path]) -> None:
+    if not base.exists():
+        return
+    for f in sorted(base.rglob("*")):
+        if f.is_file() and f not in keep:
+            logger.info("prune %s", f)
+            f.unlink()
+    for d in sorted(base.rglob("*"), reverse=True):
+        if d.is_dir() and not any(d.iterdir()):
+            d.rmdir()
+
+
+_NAMED_TEMPLATES = {
+    "hugo": "report_template.md.j2",
+    "plain": "report_template_plain.md.j2",
+}
+
+
+def _render_report(proj: ProjectConfig, simulations: list[dict], report_path: Path,
+                   template: str = "") -> None:
+    if template in _NAMED_TEMPLATES:
+        loader = jinja2.FileSystemLoader(str(PACKAGE_DIR))
+        template_name = _NAMED_TEMPLATES[template]
+    elif template:
+        tmpl_path = resolve(template)
+        loader = jinja2.FileSystemLoader(str(tmpl_path.parent))
+        template_name = tmpl_path.name
+    else:
+        loader = jinja2.FileSystemLoader(str(PACKAGE_DIR))
+        template_name = "report_template.md.j2"
+
     template_data = {
         "report": {
-            "title": proj["title"],
-            "description": proj.get("description", ""),
-            "date": proj.get("date", "2026-01-01"),
-            "part_number": proj.get("part_number", ""),
+            "title": proj.title,
+            "description": proj.description,
+            "date": proj.date,
+            "part_number": proj.part_number,
+            "categories": proj.categories,
+            "tags": proj.tags,
         },
         "simulations": simulations,
     }
-    env = jinja2.Environment(
-        loader=jinja2.FileSystemLoader(str(PACKAGE_DIR)),
-        keep_trailing_newline=True,
-    )
-    output = env.get_template("report_template.md.j2").render(**template_data)
+    env = jinja2.Environment(loader=loader, keep_trailing_newline=True)
+    output = env.get_template(template_name).render(**template_data)
     report_path.parent.mkdir(parents=True, exist_ok=True)
     report_path.write_text(output)
