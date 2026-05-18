@@ -2,8 +2,10 @@ from __future__ import annotations
 
 import tomllib
 from pathlib import Path
+from typing import Any
 
-from pydantic import BaseModel
+from pydantic import BaseModel, ConfigDict
+from pydantic import Field
 
 PACKAGE_DIR = Path(__file__).parent
 _project_root: Path = Path.cwd()
@@ -12,21 +14,52 @@ _project_root: Path = Path.cwd()
 class PlotConfig(BaseModel):
     label: str
     title: str = ""
+    filename: str = ""  # output PNG stem; defaults to label
+    raw: str = ""       # source .raw file stem; defaults to filename/label
     vars: list[str] = []
     db: bool = False
     description: str = ""
 
+    @property
+    def stem(self) -> str:
+        return self.filename or self.label
+
+    @property
+    def raw_stem(self) -> str:
+        return self.raw or self.label
+
 
 class CircuitConfig(BaseModel):
+    model_config = ConfigDict(arbitrary_types_allowed=True)
+
     slug: str
     name: str
     asc: str
     input_node: str
     output_node: str
-    test_suite: str = ""
+    input_source: str = "VIN"
+    lib_dir: str = ""
     existing_sim_dir: str = ""
-    plots: list[PlotConfig] = []
+    plots: list[PlotConfig] = Field(default_factory=list)
     description: str = ""
+    suite_type: str = ""  # TOML-only fallback
+    suite_instance: Any = (
+        None  # set in Python configs; takes precedence over suite_type
+    )
+
+    def suite(self) -> list:
+        if self.suite_instance is not None:
+            return self.suite_instance.suite(
+                self.input_source, self.input_node, self.output_node
+            )
+        if self.suite_type:
+            from .suites import _SUITE_REGISTRY
+
+            fn = _SUITE_REGISTRY.get(self.suite_type)
+            if fn is None:
+                raise ValueError(f"Unknown suite_type '{self.suite_type}'")
+            return fn(self.input_source, self.input_node, self.output_node)
+        raise NotImplementedError(f"{type(self).__name__} must implement suite()")
 
 
 class PathsConfig(BaseModel):
@@ -37,7 +70,7 @@ class PathsConfig(BaseModel):
 
 
 class ReportConfig(BaseModel):
-    template: str = ""   # "hugo", "plain", or a path to a .j2 file
+    template: str = ""  # "hugo", "plain", or a path to a .j2 file
     path: str
 
 
@@ -73,7 +106,9 @@ def resolve(path_str: str) -> Path:
     return (_project_root / path_str).resolve()
 
 
-def filter_circuits(circuits: list[CircuitConfig], slug: str | None) -> list[CircuitConfig]:
+def filter_circuits(
+    circuits: list[CircuitConfig], slug: str | None
+) -> list[CircuitConfig]:
     if slug is None:
         return circuits
     matches = [c for c in circuits if c.slug == slug]

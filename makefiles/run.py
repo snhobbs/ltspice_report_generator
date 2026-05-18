@@ -10,6 +10,7 @@ from simulation_reporter.config import (
     ProjectConfig,
     ReportConfig,
 )
+from simulation_reporter.suites import OpampStandardSuite
 from simulation_reporter import pipeline
 
 # ── Config ────────────────────────────────────────────────────────────────────
@@ -44,8 +45,9 @@ config = Config(
             asc=str(EXPATH / "differentiating-opamp.asc"),
             input_node="IN",
             output_node="OUT",
-            test_suite="opamp_standard",
+            input_source="VIN",
             plots=COMMON_PLOTS,
+            suite_instance=OpampStandardSuite(),
         ),
         CircuitConfig(
             slug="integrating-opamp",
@@ -53,8 +55,9 @@ config = Config(
             asc=str(EXPATH / "integrating-opamp.asc"),
             input_node="IN",
             output_node="OUT",
-            test_suite="opamp_standard",
+            input_source="VIN",
             plots=COMMON_PLOTS,
+            suite_instance=OpampStandardSuite(),
         ),
         CircuitConfig(
             slug="noninverting-opamp",
@@ -62,8 +65,9 @@ config = Config(
             asc=str(EXPATH / "noninverting-opamp.asc"),
             input_node="IN",
             output_node="OUT",
-            test_suite="opamp_standard",
+            input_source="VIN",
             plots=COMMON_PLOTS,
+            suite_instance=OpampStandardSuite(),
         ),
         CircuitConfig(
             slug="inverting-opamp",
@@ -71,8 +75,9 @@ config = Config(
             asc=str(EXPATH / "inverting-opamp.asc"),
             input_node="IN",
             output_node="OUT",
-            test_suite="opamp_standard",
+            input_source="VIN",
             plots=COMMON_PLOTS,
+            suite_instance=OpampStandardSuite(),
         ),
     ],
 )

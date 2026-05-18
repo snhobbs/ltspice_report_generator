@@ -6,7 +6,7 @@ import click
 
 from .config import load_config
 from .pipeline import svg as _svg, sim as _sim, plots as _plots, report as _report
-from .suites import load_suite
+from .suites import load_suite_from_script
 from ltspice_runner.runner import DEFAULT_LTSPICE
 
 
@@ -110,8 +110,7 @@ def _load_script(ctx) -> tuple[callable | None, callable | None]:
     script_path = ctx.obj.get("script_path")
     if script_path is None:
         return None, None
-    # pass a dummy circuit dict — script overrides the whole suite
-    suite_fn, plot_fn = load_suite(None, script_path)
+    suite_fn, plot_fn = load_suite_from_script(script_path)
     return plot_fn, suite_fn
 
 

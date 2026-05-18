@@ -18,7 +18,7 @@ slug        = "differentiating-opamp"
 asc         = "circuits/differentiating-opamp.asc"
 input_node  = "IN"
 output_node = "OUT"
-test_suite  = "opamp_standard"
+suite_type  = "opamp_standard"
 
 [[circuits.plots]]
 label = "step_response"
@@ -41,7 +41,7 @@ slug        = "integrating-opamp"
 asc         = "circuits/integrating-opamp.asc"
 input_node  = "IN"
 output_node = "OUT"
-test_suite  = "opamp_standard"
+suite_type  = "opamp_standard"
 
 [[circuits.plots]]
 label = "step_response"
@@ -64,7 +64,7 @@ slug        = "noninverting-opamp"
 asc         = "circuits/noninverting-opamp.asc"
 input_node  = "IN"
 output_node = "OUT"
-test_suite  = "opamp_standard"
+suite_type  = "opamp_standard"
 
 [[circuits.plots]]
 label = "step_response"
@@ -87,7 +87,7 @@ slug        = "inverting-opamp"
 asc         = "circuits/inverting-opamp.asc"
 input_node  = "IN"
 output_node = "OUT"
-test_suite  = "opamp_standard"
+suite_type  = "opamp_standard"
 
 [[circuits.plots]]
 label = "step_response"

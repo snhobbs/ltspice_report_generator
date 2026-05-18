@@ -1,0 +1,59 @@
+SHELL    := /bin/bash
+RUN      := python run_amp.py
+
+# ── Circuit configuration ─────────────────────────────────────────────────────
+export CIRCUIT      := la-22
+export ASC          := /home/simon/projects/labamps/spice/labampAsBuilt.asc
+export INPUT_NODE   := IN
+export OUTPUT_NODE  := OUT
+export PROJECT_NAME := $(CIRCUIT)
+export BUILD_DIR    := build-amp
+export HUGO_ROOT    := ../hugo-site
+export LIB_DIR      := /home/simon/projects/labamps/spice
+
+REPORTS := $(BUILD_DIR)/$(PROJECT_NAME).md $(BUILD_DIR)/$(PROJECT_NAME)-plain.md
+
+.PHONY: all svg sim plots replot report clean
+
+all: svg sim plots report
+
+# Only declare the .asc as a prerequisite when it's reachable locally.
+# If the file isn't present (e.g. on a CI box or a different machine),
+# Make uses whatever is already in the build tree.
+_ASC_DEP := $(wildcard $(ASC))
+
+# ── Schematic ─────────────────────────────────────────────────────────────────
+svg: $(BUILD_DIR)/$(CIRCUIT)/schematic.svg
+
+$(BUILD_DIR)/$(CIRCUIT)/schematic.svg: $(_ASC_DEP) run_amp.py
+	@mkdir -p $(@D)
+	$(RUN) svg
+
+# ── Simulation ────────────────────────────────────────────────────────────────
+sim: $(BUILD_DIR)/$(CIRCUIT)/.sim.stamp
+
+$(BUILD_DIR)/$(CIRCUIT)/.sim.stamp: $(_ASC_DEP) run_amp.py
+	@mkdir -p $(@D)
+	$(RUN) sim
+	@touch $@
+
+# ── Plots ─────────────────────────────────────────────────────────────────────
+plots: $(BUILD_DIR)/.plots.stamp
+
+$(BUILD_DIR)/.plots.stamp: $(BUILD_DIR)/$(CIRCUIT)/schematic.svg $(BUILD_DIR)/$(CIRCUIT)/.sim.stamp
+	$(RUN) plots
+	@touch $@
+
+replot:
+	$(RUN) plots
+	@touch $(BUILD_DIR)/.plots.stamp
+
+# ── Reports ───────────────────────────────────────────────────────────────────
+report: $(REPORTS)
+
+$(REPORTS): $(BUILD_DIR)/.plots.stamp
+	$(RUN) report
+
+# ── Housekeeping ──────────────────────────────────────────────────────────────
+clean:
+	rm -rf $(BUILD_DIR)
