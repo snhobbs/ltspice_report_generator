@@ -1,7 +1,5 @@
-import sys
 from pathlib import Path
 
-import click
 from simulation_reporter.config import (
     CircuitConfig,
     Config,
@@ -11,7 +9,7 @@ from simulation_reporter.config import (
     ReportConfig,
 )
 from simulation_reporter.suites import OpampStandardSuite
-from simulation_reporter import pipeline
+from run_common import make_cli
 
 # ── Config ────────────────────────────────────────────────────────────────────
 
@@ -82,36 +80,7 @@ config = Config(
     ],
 )
 
-# ── CLI ───────────────────────────────────────────────────────────────────────
-
-
-@click.group()
-def cli():
-    pass
-
-
-@cli.command()
-@click.option("--circuit", default=None, metavar="SLUG")
-def svg(circuit):
-    pipeline.svg(config, circuit_slug=circuit)
-
-
-@cli.command()
-@click.option("--circuit", default=None, metavar="SLUG")
-def sim(circuit):
-    pipeline.sim(config, circuit_slug=circuit)
-
-
-@cli.command()
-@click.option("--circuit", default=None, metavar="SLUG")
-def plots(circuit):
-    pipeline.plots(config, circuit_slug=circuit)
-
-
-@cli.command()
-def report():
-    pipeline.report(config)
-
+cli = make_cli(config, output_makefile="Makefile", script="run.py")
 
 if __name__ == "__main__":
     cli()

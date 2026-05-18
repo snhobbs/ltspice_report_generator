@@ -9,6 +9,7 @@ import jinja2
 import matplotlib
 
 matplotlib.use("Agg")
+logging.getLogger("matplotlib").setLevel(logging.ERROR)
 
 from ltspice_runner import Netlist, plot_raw
 from ltspice_runner import run_simulations as _ltspice_run
@@ -58,6 +59,24 @@ def _export_svg(ltspice_to_svg: str, asc_path: Path, out_path: Path, name: str) 
         logger.info("  -> %s", out_path)
 
 
+# ── Netlist export ────────────────────────────────────────────────────────────
+
+
+def netlist(
+    config: Config,
+    circuit_slug: str | None = None,
+    ltspice_cmd: str = DEFAULT_LTSPICE,
+) -> None:
+    for c in filter_circuits(config.circuits, circuit_slug):
+        asc_path = resolve(c.asc)
+        logger.info("netlist  %s", c.name)
+        try:
+            net_path = export_netlist(asc_path, ltspice_cmd=ltspice_cmd)
+            logger.info("  -> %s", net_path)
+        except RuntimeError as e:
+            logger.error("  ERROR: %s", e)
+
+
 # ── Simulation ────────────────────────────────────────────────────────────────
 
 
@@ -66,27 +85,32 @@ def sim(
     circuit_slug: str | None = None,
     ltspice_cmd: str = DEFAULT_LTSPICE,
     suite_fn: callable | None = None,
+    case_label: str | None = None,
 ) -> None:
     build_base = resolve(config.project.paths.build)
     for c in filter_circuits(config.circuits, circuit_slug):
-        _simulate(c, build_base / c.slug, ltspice_cmd, suite_fn)
+        _simulate(c, build_base / c.slug, ltspice_cmd, suite_fn, case_label=case_label)
 
 
 def _simulate(
-    c: CircuitConfig, build_dir: Path, ltspice_cmd: str, suite_fn: callable | None
+    c: CircuitConfig,
+    build_dir: Path,
+    ltspice_cmd: str,
+    suite_fn: callable | None,
+    case_label: str | None = None,
 ) -> None:
     asc_path = resolve(c.asc)
     build_dir.mkdir(parents=True, exist_ok=True)
     lib_dir = resolve(c.lib_dir) if c.lib_dir else None
     logger.info("sim  %s", c.name)
     try:
-        net_path = export_netlist(
-            asc_path, ltspice_cmd=ltspice_cmd, build_dir=build_dir
-        )
-        if suite_fn is not None:
-            suite = suite_fn(c.input_node, c.output_node)
-        else:
-            suite = c.suite()
+        net_path = asc_path.with_suffix(".net")
+        if not net_path.exists():
+            # Fallback for direct invocation outside Make
+            net_path = export_netlist(asc_path, ltspice_cmd=ltspice_cmd)
+        suite = suite_fn(c.input_node, c.output_node) if suite_fn else c.suite()
+        if case_label is not None:
+            suite = [case for case in suite if case.label == case_label]
         _ltspice_run(
             Netlist.from_file(net_path),
             suite,
@@ -103,7 +127,10 @@ def _simulate(
 
 
 def plots(
-    config: Config, circuit_slug: str | None = None, plot_fn: callable | None = None
+    config: Config,
+    circuit_slug: str | None = None,
+    plot_fn: callable | None = None,
+    plot_stem: str | None = None,
 ) -> None:
     build_base = resolve(config.project.paths.build)
     for c in filter_circuits(config.circuits, circuit_slug):
@@ -111,6 +138,8 @@ def plots(
         build_dir.mkdir(parents=True, exist_ok=True)
         existing_dir = resolve(c.existing_sim_dir) if c.existing_sim_dir else None
         for plot_def in c.plots:
+            if plot_stem is not None and plot_def.stem != plot_stem:
+                continue
             _plot(
                 c=c,
                 plot_def=plot_def,
