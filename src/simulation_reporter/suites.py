@@ -29,7 +29,7 @@ class OpampStandardSuite:
     pulse_width: str = "1m"
     pulse_period: str = "2m"
     tran_stop: str = "2m"
-    tran_ceiling: str = "10n"
+    tran_ceiling: str = ""
     ac_points: int = 200
     ac_start_freq: str = "1"
     ac_stop_freq: str = "10meg"
@@ -37,13 +37,15 @@ class OpampStandardSuite:
     noise_start_freq: str = "1"
     noise_stop_freq: str = "10meg"
 
-    def suite(self, input_source: str, input_node: str, output_node: str) -> list[SimulationCase]:
+    def suite(
+        self, input_source: str, input_node: str, output_node: str, input_node_minus: str = "0"
+    ) -> list[SimulationCase]:
         return [
             SimulationCase(
                 VoltageSource(
                     input_source,
                     input_node,
-                    "0",
+                    input_node_minus,
                     Pulse(
                         "0",
                         self.pulse_amplitude,
@@ -55,20 +57,18 @@ class OpampStandardSuite:
                 ),
                 Transient(self.tran_stop, step_ceiling=self.tran_ceiling),
                 label="step_response",
-                plot_vars=[f"V({input_node})", f"V({output_node})"],
             ),
             SimulationCase(
-                VoltageSource(input_source, input_node, "0", ACSource("1")),
+                VoltageSource(input_source, input_node, input_node_minus, ACSource("1")),
                 AC(
                     points=self.ac_points,
                     start_freq=self.ac_start_freq,
                     stop_freq=self.ac_stop_freq,
                 ),
                 label="ac_sweep",
-                plot_vars=[f"V({output_node})"],
             ),
             SimulationCase(
-                VoltageSource(input_source, input_node, "0", Constant("0")),
+                VoltageSource(input_source, input_node, input_node_minus, Constant("0")),
                 Noise(
                     output=output_node,
                     source=input_source,
@@ -77,7 +77,6 @@ class OpampStandardSuite:
                     stop_freq=self.noise_stop_freq,
                 ),
                 label="noise",
-                plot_vars=None,
             ),
         ]
 
@@ -92,7 +91,7 @@ class AmplifierStandardSuite:
     pulse_period: str = "1m"
     tran_stop: str = "2m"
     tran_stop_fast: str = "50u"
-    tran_ceiling: str = "10n"
+    tran_ceiling: str = ""
     ac_points: int = 200
     ac_start_freq: str = "1"
     ac_stop_freq: str = "100meg"
@@ -124,18 +123,22 @@ class AmplifierStandardSuite:
         dc_points       : number of DC sweep steps across the input range
         **overrides     : any field name to override after computation
         """
-        t_rise = 0.35 / max(bandwidth)
+        f_low, f_high = min(bandwidth), max(bandwidth)
+        f_low_eff = (
+            f_low if f_low > 0 else f_high / 10 ** (bw_decades_below + bw_decades_above)
+        )
+        t_rise = 0.35 / f_high
         in_swing = (output_range[1] - output_range[0]) / abs(gain)
         pulse_amplitude = in_swing / 2
         pulse_rise = t_rise / 10
-        pulse_width = 1 / min(bandwidth)
-        pulse_width_fast = 5.0 / max(bandwidth)
+        pulse_width = 1 / f_low_eff
+        pulse_width_fast = 5.0 / f_high
         pulse_period = 2.0 * pulse_width
-        tran_stop = 2.0 * pulse_period          # slow step: 4 full periods of min BW
+        tran_stop = 2.0 * pulse_period  # slow step: 4 full periods of min BW
         tran_stop_fast = 10.0 * pulse_width_fast  # fast step: 10 pulse widths at max BW
-        tran_ceiling = t_rise / 20.0
-        ac_start = min(bandwidth) / 10**bw_decades_below
-        ac_stop = max(bandwidth) * 10**bw_decades_above
+        tran_ceiling = tran_stop_fast / 1000
+        ac_start = f_low_eff / 10**bw_decades_below
+        ac_stop = f_high * 10**bw_decades_above
         dc_start = output_range[0] / abs(gain)
         dc_stop = output_range[1] / abs(gain)
         dc_step = (dc_stop - dc_start) / dc_points
@@ -164,11 +167,11 @@ class AmplifierStandardSuite:
         )
 
     def suite(
-        self, input_source: str, input_node: str, output_node: str
+        self, input_source: str, input_node: str, output_node: str, input_node_minus: str = "0"
     ) -> list[SimulationCase]:
         return [
             SimulationCase(
-                VoltageSource(input_source, input_node, "0", Constant("0")),
+                VoltageSource(input_source, input_node, input_node_minus, Constant("0")),
                 OperatingPoint(),
                 label="op",
             ),
@@ -176,7 +179,7 @@ class AmplifierStandardSuite:
                 VoltageSource(
                     input_source,
                     input_node,
-                    "0",
+                    input_node_minus,
                     Pulse(
                         "0",
                         self.pulse_amplitude,
@@ -188,13 +191,12 @@ class AmplifierStandardSuite:
                 ),
                 Transient(self.tran_stop_fast, step_ceiling=self.tran_ceiling),
                 label="fast_step_response",
-                plot_vars=[f"V({input_node})", f"V({output_node})"],
             ),
             SimulationCase(
                 VoltageSource(
                     input_source,
                     input_node,
-                    "0",
+                    input_node_minus,
                     Pulse(
                         "0",
                         self.pulse_amplitude,
@@ -206,20 +208,18 @@ class AmplifierStandardSuite:
                 ),
                 Transient(self.tran_stop, step_ceiling=self.tran_ceiling),
                 label="step_response",
-                plot_vars=[f"V({input_node})", f"V({output_node})"],
             ),
             SimulationCase(
-                VoltageSource(input_source, input_node, "0", ACSource("1")),
+                VoltageSource(input_source, input_node, input_node_minus, ACSource("1")),
                 AC(
                     points=self.ac_points,
                     start_freq=self.ac_start_freq,
                     stop_freq=self.ac_stop_freq,
                 ),
                 label="ac_sweep",
-                plot_vars=[f"V({output_node})"],
             ),
             SimulationCase(
-                VoltageSource(input_source, input_node, "0", Constant("0")),
+                VoltageSource(input_source, input_node, input_node_minus, Constant("0")),
                 Noise(
                     output=output_node,
                     source=input_source,
@@ -228,10 +228,9 @@ class AmplifierStandardSuite:
                     stop_freq=self.noise_stop_freq,
                 ),
                 label="noise",
-                plot_vars=None,
             ),
             SimulationCase(
-                VoltageSource(input_source, input_node, "0", Constant("0")),
+                VoltageSource(input_source, input_node, input_node_minus, Constant("0")),
                 DC(
                     source=input_source,
                     start=self.dc_start,
@@ -239,7 +238,6 @@ class AmplifierStandardSuite:
                     step=self.dc_step,
                 ),
                 label="dc_sweep",
-                plot_vars=[f"V({input_node})", f"V({output_node})"],
             ),
         ]
 
@@ -252,15 +250,18 @@ class PhotoreceiverStandardSuite:
     The pulse amplitude is set so a half-swing input current produces a
     half-swing output voltage, keeping the output well within its linear range.
     """
-    pulse_amplitude: str = "100u"   # A
+
+    pulse_amplitude: str = "100u"  # A
     pulse_rise: str = "1n"
     pulse_fall: str = "1n"
     pulse_width: str = "500u"
     pulse_width_fast: str = "5u"
     pulse_period: str = "1m"
+    pulse_period_fast: str = "1m"
     tran_stop: str = "2m"
     tran_stop_fast: str = "50u"
-    tran_ceiling: str = "10n"
+    tran_ceiling: str = ""
+    tran_ceiling_slow: str = ""
     ac_points: int = 200
     ac_start_freq: str = "1"
     ac_stop_freq: str = "100meg"
@@ -294,21 +295,28 @@ class PhotoreceiverStandardSuite:
         dc_points       : number of DC sweep steps across the input range
         **overrides     : any field name to override after computation
         """
+        f_low, f_high = min(bandwidth), max(bandwidth)
+        f_low_eff = (
+            f_low if f_low > 0 else f_high / 10 ** (bw_decades_below + bw_decades_above)
+        )
         overall_gain = transimpedance * secondary_gain  # V/A
         i_swing = (output_range[1] - output_range[0]) / overall_gain
         pulse_amplitude = i_swing / 2
 
-        t_rise = 0.35 / max(bandwidth)
+        t_rise = 0.35 / f_high
         pulse_rise = t_rise / 10
-        pulse_width = 1.0 / min(bandwidth)
-        pulse_width_fast = 5.0 / max(bandwidth)
-        pulse_period = 2.0 * pulse_width
-        tran_stop = 2.0 * pulse_period
-        tran_stop_fast = 10.0 * pulse_width_fast
-        tran_ceiling = t_rise / 20.0
 
-        ac_start = min(bandwidth) / 10 ** bw_decades_below
-        ac_stop = max(bandwidth) * 10 ** bw_decades_above
+        pulse_width = overrides.pop("pulse_width", 1.0 / f_low_eff)
+        pulse_period = overrides.pop("pulse_period", 3 * pulse_width)
+        tran_stop = 4 * pulse_width
+
+        pulse_width_fast = 5.0 / f_high
+        pulse_period_fast = 3 * pulse_width_fast
+        tran_stop_fast = 4 * pulse_width_fast
+        # tran_ceiling = tran_stop_fast / 1000
+
+        ac_start = f_low_eff / 10**bw_decades_below
+        ac_stop = f_high * 10**bw_decades_above
 
         dc_start = output_range[0] / overall_gain
         dc_stop = output_range[1] / overall_gain
@@ -324,9 +332,10 @@ class PhotoreceiverStandardSuite:
             pulse_width=_f(pulse_width),
             pulse_width_fast=_f(pulse_width_fast),
             pulse_period=_f(pulse_period),
+            pulse_period_fast=_f(pulse_period_fast),
             tran_stop=_f(tran_stop),
             tran_stop_fast=_f(tran_stop_fast),
-            tran_ceiling=_f(tran_ceiling),
+            tran_ceiling_slow=_f(pulse_rise * 10),
             ac_start_freq=_f(ac_start),
             ac_stop_freq=_f(ac_stop),
             noise_start_freq=_f(ac_start),
@@ -338,18 +347,24 @@ class PhotoreceiverStandardSuite:
         )
 
     def suite(
-        self, input_source: str, input_node: str, output_node: str
+        self, input_source: str, input_node: str, output_node: str, input_node_minus: str = "0"
     ) -> list[SimulationCase]:
-        src = lambda waveform: CurrentSource(input_source, input_node, "0", waveform)
+        src = lambda waveform: CurrentSource(input_source, input_node, input_node_minus, waveform)
         pulse_fast = Pulse(
-            "0", self.pulse_amplitude,
-            rise=self.pulse_rise, fall=self.pulse_fall,
-            width=self.pulse_width_fast, period=self.pulse_period,
+            "0",
+            self.pulse_amplitude,
+            rise=self.pulse_rise,
+            fall=self.pulse_fall,
+            width=self.pulse_width_fast,
+            period=self.pulse_period_fast,
         )
         pulse_slow = Pulse(
-            "0", self.pulse_amplitude,
-            rise=self.pulse_rise, fall=self.pulse_fall,
-            width=self.pulse_width, period=self.pulse_period,
+            "0",
+            self.pulse_amplitude,
+            rise=self.pulse_rise,
+            fall=self.pulse_fall,
+            width=self.pulse_width,
+            period=self.pulse_period,
         )
         return [
             SimulationCase(
@@ -361,35 +376,41 @@ class PhotoreceiverStandardSuite:
                 src(pulse_fast),
                 Transient(self.tran_stop_fast, step_ceiling=self.tran_ceiling),
                 label="fast_step_response",
-                plot_vars=[f"V({output_node})"],
             ),
             SimulationCase(
                 src(pulse_slow),
-                Transient(self.tran_stop, step_ceiling=self.tran_ceiling),
+                Transient(self.tran_stop, step_ceiling=self.tran_ceiling_slow),
                 label="step_response",
-                plot_vars=[f"V({output_node})"],
             ),
             SimulationCase(
                 src(ACSource("1")),
-                AC(points=self.ac_points, start_freq=self.ac_start_freq,
-                   stop_freq=self.ac_stop_freq),
+                AC(
+                    points=self.ac_points,
+                    start_freq=self.ac_start_freq,
+                    stop_freq=self.ac_stop_freq,
+                ),
                 label="ac_sweep",
-                plot_vars=[f"V({output_node})"],
             ),
             SimulationCase(
                 src(Constant("0")),
-                Noise(output=output_node, source=input_source,
-                      points=self.noise_points, start_freq=self.noise_start_freq,
-                      stop_freq=self.noise_stop_freq),
+                Noise(
+                    output=output_node,
+                    source=input_source,
+                    points=self.noise_points,
+                    start_freq=self.noise_start_freq,
+                    stop_freq=self.noise_stop_freq,
+                ),
                 label="noise",
-                plot_vars=["V(onoise)"],
             ),
             SimulationCase(
                 src(Constant("0")),
-                DC(source=input_source, start=self.dc_start,
-                   stop=self.dc_stop, step=self.dc_step),
+                DC(
+                    source=input_source,
+                    start=self.dc_start,
+                    stop=self.dc_stop,
+                    step=self.dc_step,
+                ),
                 label="dc_sweep",
-                plot_vars=[f"V({output_node})"],
             ),
         ]
 
@@ -397,7 +418,9 @@ class PhotoreceiverStandardSuite:
 _SUITE_REGISTRY: dict[str, callable] = {
     "opamp_standard": lambda src, i, o: OpampStandardSuite().suite(src, i, o),
     "amplifier_standard": lambda src, i, o: AmplifierStandardSuite().suite(src, i, o),
-    "photoreceiver_standard": lambda src, i, o: PhotoreceiverStandardSuite().suite(src, i, o),
+    "photoreceiver_standard": lambda src, i, o: PhotoreceiverStandardSuite().suite(
+        src, i, o
+    ),
 }
 
 

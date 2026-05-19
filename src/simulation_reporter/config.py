@@ -4,7 +4,7 @@ import tomllib
 from pathlib import Path
 from typing import Any
 
-from pydantic import BaseModel, ConfigDict
+from pydantic import BaseModel, ConfigDict, model_validator
 from pydantic import Field
 
 PACKAGE_DIR = Path(__file__).parent
@@ -15,8 +15,9 @@ class PlotConfig(BaseModel):
     label: str
     title: str = ""
     filename: str = ""  # output PNG stem; defaults to label
-    raw: str = ""       # source .raw file stem; defaults to filename/label
+    raw: str = ""  # source .raw file stem; defaults to filename/label
     vars: list[str] = []
+    right_vars: list[str] = []  # if non-empty, rendered on a twin y-axis
     db: bool = False
     description: str = ""
 
@@ -36,10 +37,17 @@ class CircuitConfig(BaseModel):
     name: str
     asc: str
     input_node: str
+    input_node_minus: str = "0"
     output_node: str
     input_source: str = "VIN"
     lib_dir: str = ""
     existing_sim_dir: str = ""
+
+    @model_validator(mode="after")
+    def _default_lib_dir(self) -> "CircuitConfig":
+        if not self.lib_dir:
+            self.lib_dir = str(Path(self.asc).parent)
+        return self
     plots: list[PlotConfig] = Field(default_factory=list)
     description: str = ""
     suite_type: str = ""  # TOML-only fallback
@@ -50,7 +58,10 @@ class CircuitConfig(BaseModel):
     def suite(self) -> list:
         if self.suite_instance is not None:
             return self.suite_instance.suite(
-                self.input_source, self.input_node, self.output_node
+                self.input_source,
+                self.input_node,
+                self.output_node,
+                input_node_minus=self.input_node_minus,
             )
         if self.suite_type:
             from .suites import _SUITE_REGISTRY

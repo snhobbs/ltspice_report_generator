@@ -8,33 +8,35 @@ from simulation_reporter.config import (
     ProjectConfig,
     ReportConfig,
 )
-from simulation_reporter.suites import AmplifierStandardSuite
+from simulation_reporter.suites import PhotoreceiverStandardSuite
 from run_common import make_cli
 
 # ── Config ────────────────────────────────────────────────────────────────────
 
-PROJECT_NAME = "la-22"
-BUILD_DIR = "build-amp"
+PROJECT_NAME = "ql03"
+
+BUILD_DIR = f"build-{PROJECT_NAME}"
 HUGO_ROOT = "../hugo-site"
 
 
-def make_plots(input_node: str, output_node: str) -> list:
-    IN, OUT = f"V({input_node})", f"V({output_node})"
+def make_plots(output_node: str, input_source: str = "I1") -> list:
+    I_IN = f"I({input_source})"
+    OUT = f"V({output_node})"
     return [
         PlotConfig(label="op", title="Operating Point"),
         PlotConfig(
-            label="step_response", title="Step Response", vars=[IN], right_vars=[OUT]
+            label="step_response", title="Step Response", vars=[I_IN], right_vars=[OUT]
         ),
         PlotConfig(
             label="fast_step_response",
             title="Step Response (Fast)",
-            vars=[IN],
+            vars=[I_IN],
             right_vars=[OUT],
         ),
         PlotConfig(
             label="ac_sweep",
             title="AC Sweep",
-            vars=[IN],
+            vars=[I_IN],
             right_vars=[OUT, "gain"],
             db=True,
         ),
@@ -51,9 +53,11 @@ def make_plots(input_node: str, output_node: str) -> list:
             label="noise",
             filename="noise_combined",
             title="Noise Sources",
-            vars=["V(R8)", "V(J1)", "V(J2)", "V(onoise)"],
+            vars=["V(R16)", "V(J1)", "V(onoise)"],
         ),
-        PlotConfig(label="dc_sweep", title="DC Transfer", vars=[IN], right_vars=[OUT]),
+        PlotConfig(
+            label="dc_sweep", title="DC Transfer", vars=[I_IN], right_vars=[OUT]
+        ),
     ]
 
 
@@ -73,38 +77,28 @@ config = Config(
     ),
     circuits=[
         CircuitConfig(
-            slug="la-22-THS4631",
-            name="La 22 THS4631",
-            asc="/home/simon/projects/labamps/spice/labampTHS4631_11nsHacked2024-03-05.asc",
-            input_node="N011",
+            slug="ql03",
+            name="QL03",
+            asc="/home/simon/projects/ql03/spice/QL03LowCostQuietTIAnoise3.asc",
+            input_node="sj",
             output_node="OUT",
-            input_source="V5",
-            plots=make_plots("N011", "OUT"),
-            suite_instance=AmplifierStandardSuite.from_specs(
-                bandwidth=(1000, 30e6),
+            input_source="I1",
+            plots=make_plots("OUT", "I1"),
+            suite_instance=PhotoreceiverStandardSuite.from_specs(
+                secondary_gain=1,
+                transimpedance=1e6,
                 output_range=(-10, 10),
-                gain=100,
-            ),
-        ),
-        CircuitConfig(
-            slug="la-22-built",
-            name="La 22 As Built",
-            asc="/home/simon/projects/labamps/spice/labampAsBuilt.asc",
-            input_node="N009",
-            output_node="OUT",
-            input_source="V5",
-            plots=make_plots("N009", "OUT"),
-            suite_instance=AmplifierStandardSuite.from_specs(
-                bandwidth=(1000, 30e6),
-                output_range=(-10, 10),
-                gain=100,
+                bandwidth=(0, 1e6),
+                pulse_width=1000e-6,
             ),
         ),
     ],
 )
 
 
-cli = make_cli(config, output_makefile="Makefile.amp", script="run_amp.py")
+cli = make_cli(
+    config, output_makefile=f"Makefile.{PROJECT_NAME}", script=f"run_{PROJECT_NAME}.py"
+)
 
 if __name__ == "__main__":
     cli()

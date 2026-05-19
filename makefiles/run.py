@@ -8,18 +8,32 @@ from simulation_reporter.config import (
     ProjectConfig,
     ReportConfig,
 )
-from simulation_reporter.suites import OpampStandardSuite
+from simulation_reporter.suites import AmplifierStandardSuite
 from run_common import make_cli
 
 # ── Config ────────────────────────────────────────────────────────────────────
 
-COMMON_PLOTS = [
-    PlotConfig(label="step_response", title="Step Response", vars=["V(IN)", "V(OUT)"]),
-    PlotConfig(label="ac_sweep", title="AC Sweep", vars=["V(OUT)"], db=True),
-    PlotConfig(label="noise", title="Noise"),
-]
-
 EXPATH = Path("/home/simon/projects/eoi-document-generator/libs/ltspice-runner/example")
+
+
+def make_plots(input_node: str, output_node: str) -> list:
+    IN, OUT = f"V({input_node})", f"V({output_node})"
+    return [
+        PlotConfig(label="op", title="Operating Point"),
+        PlotConfig(
+            label="step_response", title="Step Response", vars=[IN], right_vars=[OUT]
+        ),
+        PlotConfig(
+            label="ac_sweep",
+            title="AC Sweep",
+            vars=[IN],
+            right_vars=[OUT, "gain"],
+            db=True,
+        ),
+        PlotConfig(label="noise", title="Noise"),
+        PlotConfig(label="dc_sweep", title="DC Transfer", vars=[IN], right_vars=[OUT]),
+    ]
+
 
 config = Config(
     project=ProjectConfig(
@@ -32,7 +46,7 @@ config = Config(
             hugo_root="../hugo-site",
         ),
         reports=[
-            ReportConfig(template="hugo",  path="build/opamp-examples.md"),
+            ReportConfig(template="hugo", path="build/opamp-examples.md"),
             ReportConfig(template="plain", path="build/opamp-examples-plain.md"),
         ],
     ),
@@ -44,8 +58,12 @@ config = Config(
             input_node="IN",
             output_node="OUT",
             input_source="VIN",
-            plots=COMMON_PLOTS,
-            suite_instance=OpampStandardSuite(),
+            plots=make_plots("IN", "OUT"),
+            suite_instance=AmplifierStandardSuite.from_specs(
+                bandwidth=(10, 1e6),
+                output_range=(-10, 10),
+                gain=10,
+            ),
         ),
         CircuitConfig(
             slug="integrating-opamp",
@@ -54,8 +72,12 @@ config = Config(
             input_node="IN",
             output_node="OUT",
             input_source="VIN",
-            plots=COMMON_PLOTS,
-            suite_instance=OpampStandardSuite(),
+            plots=make_plots("IN", "OUT"),
+            suite_instance=AmplifierStandardSuite.from_specs(
+                bandwidth=(10, 1e6),
+                output_range=(-10, 10),
+                gain=10,
+            ),
         ),
         CircuitConfig(
             slug="noninverting-opamp",
@@ -64,8 +86,12 @@ config = Config(
             input_node="IN",
             output_node="OUT",
             input_source="VIN",
-            plots=COMMON_PLOTS,
-            suite_instance=OpampStandardSuite(),
+            plots=make_plots("IN", "OUT"),
+            suite_instance=AmplifierStandardSuite.from_specs(
+                bandwidth=(10, 1e6),
+                output_range=(-10, 10),
+                gain=10,
+            ),
         ),
         CircuitConfig(
             slug="inverting-opamp",
@@ -74,8 +100,12 @@ config = Config(
             input_node="IN",
             output_node="OUT",
             input_source="VIN",
-            plots=COMMON_PLOTS,
-            suite_instance=OpampStandardSuite(),
+            plots=make_plots("IN", "OUT"),
+            suite_instance=AmplifierStandardSuite.from_specs(
+                bandwidth=(10, 1e6),
+                output_range=(-10, 10),
+                gain=10,
+            ),
         ),
     ],
 )

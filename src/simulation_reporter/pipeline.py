@@ -92,6 +92,18 @@ def sim(
         _simulate(c, build_base / c.slug, ltspice_cmd, suite_fn, case_label=case_label)
 
 
+def _saves_from_plots(plots: list[PlotConfig]) -> dict[str, list[str]]:
+    """Derive per-label save lists from PlotConfig vars, skipping computed names."""
+    from collections import defaultdict
+
+    acc: defaultdict[str, set[str]] = defaultdict(set)
+    for p in plots:
+        for var in p.vars + p.right_vars:
+            # if var.upper().startswith(("V(", "I(")):
+            acc[p.raw_stem].add(var)
+    return {label: sorted(vs) for label, vs in acc.items()}
+
+
 def _simulate(
     c: CircuitConfig,
     build_dir: Path,
@@ -117,6 +129,7 @@ def _simulate(
             build_dir,
             lib_dir=lib_dir,
             ltspice_cmd=ltspice_cmd,
+            saves=_saves_from_plots(c.plots),
         )
         logger.info("  -> %s", build_dir)
     except RuntimeError as e:
@@ -171,6 +184,7 @@ def _plot(
             plot_raw(
                 raw_path,
                 variables=plot_def.vars,
+                right_vars=plot_def.right_vars or None,
                 output_path=png_path,
                 title=title,
                 db=plot_def.db,
