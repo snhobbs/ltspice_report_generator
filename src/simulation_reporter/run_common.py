@@ -3,8 +3,8 @@ from pathlib import Path
 
 import click
 import jinja2
-from simulation_reporter import pipeline
-from simulation_reporter.config import Config
+from . import pipeline
+from .config import Config
 
 
 def _build_circuits_data(config: Config, build: str) -> tuple[list[dict], str | None]:
@@ -19,7 +19,9 @@ def _build_circuits_data(config: Config, build: str) -> tuple[list[dict], str | 
             if case.label not in seen:
                 seen.add(case.label)
                 sim_labels.append(case.label)
-        plot_entries = [{"stem": p.stem, "raw_stem": p.raw_stem} for p in c.plots if p.vars]
+        plot_entries = [
+            {"stem": p.stem, "raw_stem": p.raw_stem} for p in c.plots if p.vars
+        ]
         asc_name = Path(c.asc).name
         if expath:
             asc_dep = f"$(EXPATH)/{asc_name}"
@@ -28,14 +30,16 @@ def _build_circuits_data(config: Config, build: str) -> tuple[list[dict], str | 
             asc_dep = str(Path(c.asc).resolve())
             net_path = str(Path(c.asc).with_suffix(".net"))
         raw_targets = [f"{build}/{c.slug}/{lbl}.raw" for lbl in sim_labels]
-        data.append({
-            "slug": c.slug,
-            "asc_dep": asc_dep,
-            "net_path": net_path,
-            "sim_labels": sim_labels,
-            "plot_entries": plot_entries,
-            "raw_targets_str": " \\\n".join(raw_targets),
-        })
+        data.append(
+            {
+                "slug": c.slug,
+                "asc_dep": asc_dep,
+                "net_path": net_path,
+                "sim_labels": sim_labels,
+                "plot_entries": plot_entries,
+                "raw_targets_str": " \\\n".join(raw_targets),
+            }
+        )
     return data, expath
 
 
@@ -47,8 +51,16 @@ def generate_makefile(config: Config, output_makefile: str, script: str) -> str:
     join = lambda files: " \\\n    ".join(files)
     svg_files = [f"{build}/{c['slug']}/schematic.svg" for c in circuits_data]
     net_files = [c["net_path"] for c in circuits_data]
-    raw_files = [f"{build}/{c['slug']}/{lbl}.raw" for c in circuits_data for lbl in c["sim_labels"]]
-    png_files = [f"{build}/{c['slug']}/{e['stem']}.png" for c in circuits_data for e in c["plot_entries"]]
+    raw_files = [
+        f"{build}/{c['slug']}/{lbl}.raw"
+        for c in circuits_data
+        for lbl in c["sim_labels"]
+    ]
+    png_files = [
+        f"{build}/{c['slug']}/{e['stem']}.png"
+        for c in circuits_data
+        for e in c["plot_entries"]
+    ]
 
     env = jinja2.Environment(
         loader=jinja2.FileSystemLoader(str(Path(__file__).parent)),
@@ -94,13 +106,17 @@ def make_cli(config: Config, output_makefile: str, script: str) -> click.Group:
 
     @cli.command()
     @click.option("--circuit", default=None, metavar="SLUG")
-    @click.option("--label", default=None, help="Run only the simulation case with this label.")
+    @click.option(
+        "--label", default=None, help="Run only the simulation case with this label."
+    )
     def sim(circuit, label):
         pipeline.sim(config, circuit_slug=circuit, case_label=label)
 
     @cli.command()
     @click.option("--circuit", default=None, metavar="SLUG")
-    @click.option("--stem", default=None, help="Render only the plot with this output stem.")
+    @click.option(
+        "--stem", default=None, help="Render only the plot with this output stem."
+    )
     def plots(circuit, stem):
         pipeline.plots(config, circuit_slug=circuit, plot_stem=stem)
 
@@ -109,7 +125,13 @@ def make_cli(config: Config, output_makefile: str, script: str) -> click.Group:
         pipeline.report(config)
 
     @cli.command(name="makefile")
-    @click.option("--output", "-o", default="-", metavar="FILE", help="Write to FILE instead of stdout.")
+    @click.option(
+        "--output",
+        "-o",
+        default="-",
+        metavar="FILE",
+        help="Write to FILE instead of stdout.",
+    )
     def makefile_cmd(output):
         content = generate_makefile(config, output_makefile, script)
         if output == "-":

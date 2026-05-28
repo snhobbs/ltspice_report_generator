@@ -33,9 +33,9 @@ class PlotConfig(BaseModel):
 class CircuitConfig(BaseModel):
     model_config = ConfigDict(arbitrary_types_allowed=True)
 
-    slug: str
-    name: str
     asc: str
+    slug: str = ""
+    name: str = ""
     input_node: str
     input_node_minus: str = "0"
     output_node: str
@@ -47,7 +47,12 @@ class CircuitConfig(BaseModel):
     def _default_lib_dir(self) -> "CircuitConfig":
         if not self.lib_dir:
             self.lib_dir = str(Path(self.asc).parent)
+        if not self.slug:
+            self.slug = str(Path(self.asc).stem)
+        if not self.name:
+            self.name = str(Path(self.asc).stem).title()
         return self
+
     plots: list[PlotConfig] = Field(default_factory=list)
     description: str = ""
     suite_type: str = ""  # TOML-only fallback

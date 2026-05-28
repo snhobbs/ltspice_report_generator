@@ -38,7 +38,11 @@ class OpampStandardSuite:
     noise_stop_freq: str = "10meg"
 
     def suite(
-        self, input_source: str, input_node: str, output_node: str, input_node_minus: str = "0"
+        self,
+        input_source: str,
+        input_node: str,
+        output_node: str,
+        input_node_minus: str = "0",
     ) -> list[SimulationCase]:
         return [
             SimulationCase(
@@ -59,7 +63,9 @@ class OpampStandardSuite:
                 label="step_response",
             ),
             SimulationCase(
-                VoltageSource(input_source, input_node, input_node_minus, ACSource("1")),
+                VoltageSource(
+                    input_source, input_node, input_node_minus, ACSource("1")
+                ),
                 AC(
                     points=self.ac_points,
                     start_freq=self.ac_start_freq,
@@ -68,7 +74,9 @@ class OpampStandardSuite:
                 label="ac_sweep",
             ),
             SimulationCase(
-                VoltageSource(input_source, input_node, input_node_minus, Constant("0")),
+                VoltageSource(
+                    input_source, input_node, input_node_minus, Constant("0")
+                ),
                 Noise(
                     output=output_node,
                     source=input_source,
@@ -167,11 +175,17 @@ class AmplifierStandardSuite:
         )
 
     def suite(
-        self, input_source: str, input_node: str, output_node: str, input_node_minus: str = "0"
+        self,
+        input_source: str,
+        input_node: str,
+        output_node: str,
+        input_node_minus: str = "0",
     ) -> list[SimulationCase]:
         return [
             SimulationCase(
-                VoltageSource(input_source, input_node, input_node_minus, Constant("0")),
+                VoltageSource(
+                    input_source, input_node, input_node_minus, Constant("0")
+                ),
                 OperatingPoint(),
                 label="op",
             ),
@@ -210,7 +224,9 @@ class AmplifierStandardSuite:
                 label="step_response",
             ),
             SimulationCase(
-                VoltageSource(input_source, input_node, input_node_minus, ACSource("1")),
+                VoltageSource(
+                    input_source, input_node, input_node_minus, ACSource("1")
+                ),
                 AC(
                     points=self.ac_points,
                     start_freq=self.ac_start_freq,
@@ -219,7 +235,9 @@ class AmplifierStandardSuite:
                 label="ac_sweep",
             ),
             SimulationCase(
-                VoltageSource(input_source, input_node, input_node_minus, Constant("0")),
+                VoltageSource(
+                    input_source, input_node, input_node_minus, Constant("0")
+                ),
                 Noise(
                     output=output_node,
                     source=input_source,
@@ -230,7 +248,9 @@ class AmplifierStandardSuite:
                 label="noise",
             ),
             SimulationCase(
-                VoltageSource(input_source, input_node, input_node_minus, Constant("0")),
+                VoltageSource(
+                    input_source, input_node, input_node_minus, Constant("0")
+                ),
                 DC(
                     source=input_source,
                     start=self.dc_start,
@@ -336,6 +356,7 @@ class PhotoreceiverStandardSuite:
             tran_stop=_f(tran_stop),
             tran_stop_fast=_f(tran_stop_fast),
             tran_ceiling_slow=_f(pulse_rise * 10),
+            tran_ceiling=_f(pulse_rise * 10),
             ac_start_freq=_f(ac_start),
             ac_stop_freq=_f(ac_stop),
             noise_start_freq=_f(ac_start),
@@ -347,9 +368,15 @@ class PhotoreceiverStandardSuite:
         )
 
     def suite(
-        self, input_source: str, input_node: str, output_node: str, input_node_minus: str = "0"
+        self,
+        input_source: str,
+        input_node: str,
+        output_node: str,
+        input_node_minus: str = "0",
     ) -> list[SimulationCase]:
-        src = lambda waveform: CurrentSource(input_source, input_node, input_node_minus, waveform)
+        src = lambda waveform: CurrentSource(
+            input_source, input_node, input_node_minus, waveform
+        )
         pulse_fast = Pulse(
             "0",
             self.pulse_amplitude,
